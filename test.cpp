@@ -1,8 +1,12 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <sstream>
 #include <unistd.h>
 #include <fcntl.h>
+#include <cerrno>
+#include <csignal>
+#include <atomic>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <filesystem>
@@ -10,6 +14,13 @@
 #include <chrono>
 
 namespace fs = std::filesystem;
+
+// Global flag for graceful shutdown
+std::atomic<bool> running{true};
+
+void signal_handler(int signum) {
+    running = false;
+}
 
 // Global descriptors for the pipes
 int cmd_fd = -1;
@@ -68,9 +79,13 @@ int main(int argc, char* argv[]) {
     // Open pipes in the order required by the protocol [cite: 33, 38-43]
     cmd_fd = open(cmd_path.c_str(), O_WRONLY);
     data_fd = open(data_path.c_str(), O_RDONLY | O_NONBLOCK);
+    
+    // Register signal handler for clean shutdown
+    std::signal(SIGINT, signal_handler);
+    std::signal(SIGTERM, signal_handler);
 
     // Simulation loop
-    while (true) {
+    while (running) {
         // Clear screen for better display [cite: 24]
         system("clear");
 
@@ -86,11 +101,50 @@ int main(int argc, char* argv[]) {
             if (n > 0) {
                 chunk[n] = '\0';
                 buffer += chunk;
+            } else if (n == 0) {
+                std::cerr << "\n[Error] Simulator disconnected unexpectedly (EOF).\n";
+                cleanup();
+                return 1;
+            } else if (n < 0) {
+                if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10)); // wait for data
+                } else {
+                    std::cerr << "\n[Error] Failed to read from sim data pipe.\n";
+                    cleanup();
+                    return 1;
+                }
             }
         }
 
         // Print the current state to terminal [cite: 56-61]
-        std::cout << buffer << std::endl;
+        std::istringstream iss(buffer);
+        std::string line;
+        while (std::getline(iss, line)) {
+            if (line.rfind("CYCLE", 0) == 0 || line.rfind("STATS", 0) == 0 || line.rfind("MAP", 0) == 0 || line.rfind("END", 0) == 0) {
+                std::cout << "\033[1;37m" << line << "\033[0m\n";
+            } else if (line.rfind("ROW", 0) == 0) {
+                // If the ROW has an extra space after "ROW ", it's staggered
+                bool stagger = (line.length() > 4 && line[4] == ' ');
+                if (stagger) std::cout << " ";
+                
+                size_t start_idx = 4 + (stagger ? 1 : 0);
+                for (size_t i = start_idx; i < line.length(); ++i) {
+                    char c = line[i];
+                    if (c == ' ') std::cout << " ";
+                    else if (c == 'R' || c == 'r') std::cout << "\033[1;31m" << c << "\033[0m"; // Red
+                    else if (c == 'B' || c == 'b') std::cout << "\033[1;34m" << c << "\033[0m"; // Blue (Black bug)
+                    else if (c == '#') std::cout << "\033[1;30m█\033[0m"; // Dark grey block for rocks
+                    else if (c == '+') std::cout << "\033[1;41;37m+\033[0m"; // Red background nest
+                    else if (c == '-') std::cout << "\033[1;44;37m-\033[0m"; // Blue background nest
+                    else if (c >= '1' && c <= '9') std::cout << "\033[1;33m" << c << "\033[0m"; // Yellow food
+                    else if (c == '.') std::cout << "\033[1;30m.\033[0m"; // Dark grey dot for empty
+                    else std::cout << c;
+                }
+                std::cout << "\n";
+            } else {
+                std::cout << line << "\n";
+            }
+        }
 
         // Control simulation speed [cite: 8]
         std::this_thread::sleep_for(std::chrono::milliseconds(1000 / fps));

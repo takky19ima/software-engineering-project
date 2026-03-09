@@ -1,0 +1,9 @@
+; simple.buggy
+; A very simple bug that behaves randomly
+; It just chooses to move, turn left, or turn right randomly
+
+p0:  flip 3 p1 p2   ; Choose 1 of 3 branches randomly (0, 1, or 2)
+p1:  turn left p0   ; 0 -> Turn Left, then loop back
+p2:  flip 2 p3 p4   ; 0 -> move, 1 -> turn right
+p3:  turn right p0  ; Turn right, then loop back
+p4:  move p0 p0     ; Try to move forward. If blocked, still loop back
