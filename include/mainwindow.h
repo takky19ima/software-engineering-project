@@ -35,6 +35,7 @@ private:
     WorldView *view;
     QTimer *timer = nullptr;
     QSpinBox *traceSpinBox = nullptr;
+    QLabel *statusLabel = nullptr;
     std::vector<Bug> mapToBugs(const std::vector<std::string>& map);
     std::string world;
     std::string bug1;

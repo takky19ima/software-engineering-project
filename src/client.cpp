@@ -156,9 +156,7 @@ void Client::parseResponse(const std::string& response) {
     std::istringstream iss(response); //streaming from data which is provided by simulator
     std::string line;
 
-    int cycle = 0;
     int row = 0, col = 0;
-    int red_alive = 0, black_alive = 0, red_food = 0, black_food = 0;
 
     while (getline(iss, line)) {
         if (line.find("CYCLE") == 0) {

@@ -19,6 +19,12 @@ public:
     std::vector<std::string> getCurrentMap() const;
     std::vector<bool> getOffsetRows() const;
 
+    int getCycle() const { return cycle; }
+    int getRedAlive() const { return red_alive; }
+    int getBlackAlive() const { return black_alive; }
+    int getRedFood() const { return red_food; }
+    int getBlackFood() const { return black_food; }
+
     std::string step(int ticks);
 
     void stop();
@@ -33,5 +39,10 @@ private:
     std::string data_pipe;
     std::vector<std::string> currentMap; // contain each row of the world as string
     std::vector<bool> offsetRows; // track which rows have offsets
+    int cycle = 0;
+    int red_alive = 0;
+    int black_alive = 0;
+    int red_food = 0;
+    int black_food = 0;
 };
 #endif

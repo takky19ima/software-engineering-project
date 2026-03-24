@@ -1,5 +1,6 @@
 #include "worldview.h"
 #include <QPainter>
+#include <QImage>
 #include <QDebug>
 
 // constructor
@@ -58,78 +59,80 @@ void WorldView::setMap(const std::vector<std::string>& map, const std::vector<bo
 
 void WorldView::paintEvent(QPaintEvent *)
 {
-    QPainter painter(this);
-    painter.fillRect(this->rect(), QColor(180, 180, 180));
-
-
     int rows = currentMap.size();
     int cols = rows ? currentMap[0].size() : 0;
-    if (rows == 0 || cols == 0) return;
 
-    int cellSize = std::min(width() / (cols + 1), height() / rows); // +1 for hex offset
+    // ── Render to QImage first (fixes X11 forwarding) ──
+    QImage image(size(), QImage::Format_ARGB32_Premultiplied);
+    image.fill(QColor(160, 160, 160));  // gray background
 
-    // ── Pass 1: draw terrain and bugs ──
+    if (rows == 0 || cols == 0) {
+        QPainter widgetPainter(this);
+        widgetPainter.drawImage(0, 0, image);
+        return;
+    }
+
+    int cellSize = std::min(width() / (cols + 1), height() / rows);
+    if (cellSize < 2) cellSize = 2;
+
+    QPainter p(&image);
+    p.setRenderHint(QPainter::Antialiasing, true);
+
+    // ── Pass 1: draw terrain ──
     for (int r = 0; r < rows; ++r)
     {
-        int xOffset = (r < (int)offsetRows.size() && offsetRows[r]) ? cellSize / 2 : 0;
+        int xOff = (r < (int)offsetRows.size() && offsetRows[r]) ? cellSize / 2 : 0;
 
         for (int c = 0; c < (int)currentMap[r].size(); ++c)
         {
             char ch = currentMap[r][c];
-            QRect rect(c * cellSize + xOffset, r * cellSize, cellSize, cellSize);
+            QRect rect(c * cellSize + xOff, r * cellSize, cellSize, cellSize);
 
+            // base terrain fill
+            QColor fill;
             switch (ch)
             {
-                case '#':
-                    painter.fillRect(rect, QColor(80, 80, 80));
-                    break;
-                case '.':
-                    painter.fillRect(rect, QColor(220, 220, 210));
-                    break;
-                case '+':
-                    painter.fillRect(rect, QColor(255, 180, 180));
-                    break;
-                case '-':
-                    painter.fillRect(rect, QColor(180, 220, 180));
-                    break;
+                case '#':  fill = QColor(100, 100, 100); break;      // walls — dark gray
+                case '.':  fill = QColor(210, 210, 200); break;      // empty — light
+                case '+':  fill = QColor(255, 180, 180); break;      // red base — pink
+                case '-':  fill = QColor(180, 230, 180); break;      // black base — green
+                default:   fill = QColor(210, 210, 200); break;      // fallback
+            }
+            p.setPen(Qt::NoPen);
+            p.setBrush(fill);
+            p.drawRect(rect);
 
-                case 'R':
-                case 'r':
-                    painter.fillRect(rect, QColor(220, 220, 210));
-                    painter.setPen(Qt::NoPen);
-                    painter.setBrush(Qt::red);
-                    painter.drawEllipse(rect.adjusted(1,1,-1,-1));
-                    if (ch == 'r') {
-                        painter.setBrush(QColor(0, 200, 0));
-                        painter.drawEllipse(rect.adjusted(cellSize/3, cellSize/3, -cellSize/3, -cellSize/3));
-                    }
-                    painter.setBrush(Qt::NoBrush);
-                    break;
+            // cell outline
+            p.setPen(QPen(QColor(180, 180, 180), 1));
+            p.setBrush(Qt::NoBrush);
+            p.drawRect(rect);
 
-                case 'B':
-                case 'b':
-                    painter.fillRect(rect, QColor(220, 220, 210));
-                    painter.setPen(Qt::NoPen);
-                    painter.setBrush(Qt::black);
-                    painter.drawEllipse(rect.adjusted(1,1,-1,-1));
-                    if (ch == 'b') {
-                        painter.setBrush(QColor(0, 200, 0));
-                        painter.drawEllipse(rect.adjusted(cellSize/3, cellSize/3, -cellSize/3, -cellSize/3));
-                    }
-                    painter.setBrush(Qt::NoBrush);
-                    break;
-
-                default:
-                    if (ch >= '1' && ch <= '9') {
-                        painter.fillRect(rect, QColor(220, 220, 210));
-                        painter.setPen(Qt::NoPen);
-                        painter.setBrush(QColor(230, 180, 0));
-                        painter.drawEllipse(rect.adjusted(2,2,-2,-2));
-                        painter.setBrush(Qt::NoBrush);
-                    } else {
-                        painter.fillRect(rect, QColor(220, 220, 210));
-                    }
-                    break;
+            // ── Draw bugs ──
+            if (ch == 'R' || ch == 'r') {
+                p.setPen(Qt::NoPen);
+                p.setBrush(QColor(200, 30, 30));  // red bug
+                p.drawEllipse(rect.adjusted(2, 2, -2, -2));
+                if (ch == 'r') {  // carrying food
+                    p.setBrush(QColor(255, 220, 0));
+                    int d = cellSize / 4;
+                    p.drawEllipse(rect.adjusted(d, d, -d, -d));
+                }
+            }
+            else if (ch == 'B' || ch == 'b') {
+                p.setPen(Qt::NoPen);
+                p.setBrush(QColor(30, 30, 30));  // black bug
+                p.drawEllipse(rect.adjusted(2, 2, -2, -2));
+                if (ch == 'b') {  // carrying food
+                    p.setBrush(QColor(255, 220, 0));
+                    int d = cellSize / 4;
+                    p.drawEllipse(rect.adjusted(d, d, -d, -d));
+                }
+            }
+            // ── Draw food ──
+            else if (ch >= '1' && ch <= '9') {
+                p.setPen(Qt::NoPen);
+                p.setBrush(QColor(240, 200, 0));  // yellow food
+                p.drawEllipse(rect.adjusted(3, 3, -3, -3));
             }
         }
     }
@@ -137,16 +140,24 @@ void WorldView::paintEvent(QPaintEvent *)
     // ── Pass 2: trace overlay ──
     for (int r = 0; r < rows; ++r)
     {
-        int xOffset = (r < (int)offsetRows.size() && offsetRows[r]) ? cellSize / 2 : 0;
+        int xOff = (r < (int)offsetRows.size() && offsetRows[r]) ? cellSize / 2 : 0;
 
         for (int c = 0; c < (int)traceMap[r].size(); ++c)
         {
             if (traceMap[r][c] > 0)
             {
-                QRect rect(c * cellSize + xOffset, r * cellSize, cellSize, cellSize);
-                int alpha = (traceLength > 0) ? 255 * traceMap[r][c] / traceLength : 0;
-                painter.fillRect(rect, QColor(255, 165, 0, alpha));
+                QRect rect(c * cellSize + xOff, r * cellSize, cellSize, cellSize);
+                int alpha = (traceLength > 0) ? 200 * traceMap[r][c] / traceLength : 0;
+                p.setPen(Qt::NoPen);
+                p.setBrush(QColor(255, 140, 0, alpha));
+                p.drawRect(rect);
             }
         }
     }
+
+    p.end();
+
+    // ── Blit the image to the widget ──
+    QPainter widgetPainter(this);
+    widgetPainter.drawImage(0, 0, image);
 }
