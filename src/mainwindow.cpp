@@ -6,7 +6,11 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
+    resize(800, 600);
+    setWindowTitle("Bug World Simulator");
+
     view = new WorldView(this);
+    view->setAttribute(Qt::WA_OpaquePaintEvent);
     setCentralWidget(view);
 
     // ── Trace-length toolbar ──
