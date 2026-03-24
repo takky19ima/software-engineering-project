@@ -1,0 +1,204 @@
+BugWorld Client Implementation Notes
+====================================
+
+This document explains how the BugWorld client was implemented and how the
+project was debugged step by step.
+
+Project Goal
+------------
+The goal of this project was to implement a client program that communicates
+with the BugWorld simulator using named pipes.
+
+The client must:
+1. Start the simulator process
+2. Create communication pipes
+3. Send commands to the simulator
+4. Receive simulation data
+5. Display the world state continuously
+
+Communication Protocol
+----------------------
+
+The simulator communicates through two named pipes:
+
+cmd pipe  → used to send commands to the simulator  
+data pipe → used to receive simulation responses
+
+Commands are sent in the following format:
+
+STEP N
+
+Where N is the number of simulation ticks.
+
+The simulator responds with blocks like:
+
+CYCLE <number>
+MAP <width> <height>
+ROW <cells...>
+ROW <cells...>
+...
+STATS <red> <black> <food_red> <food_black>
+END
+
+The client must read data until it encounters the line:
+
+END
+
+Implementation Overview
+-----------------------
+
+The client is implemented in the following files:
+
+client.h
+client.cpp
+main.cpp
+
+client.cpp is responsible for:
+- creating the pipes
+- starting the simulator
+- sending commands
+- reading responses
+- cleaning up resources
+
+Program Flow
+------------
+
+1. Create a temporary directory for the pipes
+
+Example:
+    /tmp/bugworld_xxxxxx/
+
+2. Create named pipes using mkfifo():
+
+    cmd.pipe
+    data.pipe
+
+3. Start the simulator using fork() and execvp()
+
+The simulator is launched with:
+
+    ./sim --cmd-pipe <cmd.pipe> --data-pipe <data.pipe> world bug1 bug2
+
+4. Open the pipes
+
+The correct order is important:
+    - open data pipe first
+    - open command pipe second
+
+5. Send commands
+
+Example command sent by the client:
+
+    STEP 50
+
+6. Read simulator response
+
+The client reads from the data pipe until the string "END"
+is found.
+
+7. Print the world state
+
+Each simulation frame contains:
+    CYCLE
+    MAP
+    ROW lines
+    STATS
+    END
+
+The client prints this information to the terminal.
+
+8. Repeat the process
+
+The client continues sending STEP commands in a loop.
+
+Bug Fixes During Development
+----------------------------
+
+Several issues were encountered and fixed during development.
+
+Simulator Segmentation Fault
+----------------------------
+
+Initially the simulator crashed with a segmentation fault.
+This happened because the bug program format was incorrect.
+
+The simulator expects the classic "Ant Brain" language which includes
+instructions such as:
+
+    sense
+    move
+    turn
+    flip
+    mark
+    unmark
+    pickup
+    drop
+
+After fixing the bug program format the simulator started correctly.
+
+Named Pipe Blocking
+-------------------
+
+Opening the pipes in the wrong order caused the program to block.
+
+Correct order:
+
+    data pipe first
+    command pipe second
+
+Response Parsing
+----------------
+
+The client must read from the data pipe until it finds:
+
+    END
+
+This marks the end of the simulator response.
+
+Project Structure
+-----------------
+
+Final project files:
+
+client.cpp
+client.h
+main.cpp
+project-26.pro
+Worlds/tiny.world
+Bugs/simple.bug
+
+Additional files from the Qt interface remain in the repository but are
+not required for the terminal client.
+
+How to Run the Project
+----------------------
+
+1. Compile the project
+
+    qmake
+    make
+
+2. Run the client
+
+    ./project-26 Worlds/tiny.world Bugs/simple.bug Bugs/simple.bug
+
+The client will start the simulator and continuously print the
+simulation state.
+
+Git Workflow
+------------
+
+The project was committed and pushed using:
+
+    git add .
+    git commit -m "BugWorld client implementation"
+    git push
+
+The repository is hosted on GitHub.
+
+Conclusion
+----------
+
+The client successfully implements the BugWorld communication protocol.
+It can start the simulator, send STEP commands, and receive simulation
+updates through named pipes.

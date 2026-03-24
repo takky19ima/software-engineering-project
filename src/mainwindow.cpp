@@ -1,0 +1,60 @@
+#include "mainwindow.h"
+#include <QDebug>
+#include <QTimer>
+
+MainWindow::MainWindow(QWidget *parent)
+    : QMainWindow(parent)
+{
+
+    view = new WorldView(this);
+    setCentralWidget(view);
+}
+
+MainWindow::~MainWindow()
+{
+    client.stop();
+    
+}
+
+// mainwindow.cpp
+void MainWindow::setSimulationParameters(const std::string &world,
+                                         const std::string &bug1,
+                                         const std::string &bug2,
+                                         int ticksPerFrame,
+                                         int fps)
+{
+    this->world = world;
+    this->bug1 = bug1;
+    this->bug2 = bug2;
+    this->ticks_per_frame = ticksPerFrame;
+    this->fps = fps;
+
+    bool ok = client.start(world, bug1, bug2);
+
+    if (!ok) {
+        qDebug() << "Failed to start simulator";
+        return;
+    }else{
+        qDebug() << "Simulator started";
+    }
+
+    on_sendButton_clicked();
+}
+
+
+void MainWindow::on_sendButton_clicked()
+{
+    
+     if (!timer) {
+        timer = new QTimer(this);
+
+        connect(timer, &QTimer::timeout, this, [this]() {
+            std::string result = client.step(this->ticks_per_frame);
+            client.parseResponse(result);
+            view->setMap(client.getCurrentMap(), client.getOffsetRows());
+        });
+    }
+    
+    int interval_ms = 1000 / this->fps; // convert FPS to milliseconds per frame
+    timer->start(interval_ms); 
+}

@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>MainWindow</class>
+ <widget class="QMainWindow" name="MainWindow">
+  <property name="windowTitle">
+   <string>Client</string>
+  </property>
+
+  <widget class="QWidget" name="centralwidget">
+
+   <layout class="QVBoxLayout">
+
+    <item>
+     <layout class="QHBoxLayout">
+      <item>
+       <widget class="QLineEdit" name="ipInput"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="connectButton">
+        <property name="text">
+         <string>Connect</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+
+    <item>
+     <widget class="QTextEdit" name="chatBox"/>
+    </item>
+
+    <item>
+     <layout class="QHBoxLayout">
+      <item>
+       <widget class="QLineEdit" name="messageInput"/>
+      </item>
+      <item>
+       <widget class="QPushButton" name="sendButton">
+        <property name="text">
+         <string>Send</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </item>
+
+   </layout>
+
+  </widget>
+
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
