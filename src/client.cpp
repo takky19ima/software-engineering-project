@@ -64,6 +64,14 @@ bool Client::start(const string& world,
     }
 
     if (sim_pid == 0) {
+        // Redirect simulator stderr to a log file
+        int logfd = open("sim_error.log", O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (logfd != -1) {
+            dup2(logfd, STDERR_FILENO);
+            dup2(logfd, STDOUT_FILENO);
+            close(logfd);
+        }
+
         char* args[] = {
             (char*)"./sim",
             (char*)"--cmd-pipe",
