@@ -77,11 +77,21 @@ bool Client::start(const string& world,
 
         execvp("./sim", args);
         perror("exec failed");
-        exit(1);
+        _exit(1);
     }
+
+    fprintf(stderr, "[client] Simulator forked (pid=%d), waiting...\n", sim_pid);
 
     // Give simulator time to start
     sleep(1);
+
+    // Check if simulator is still alive
+    int status;
+    if (waitpid(sim_pid, &status, WNOHANG) != 0) {
+        fprintf(stderr, "[client] ERROR: Simulator exited immediately!\n");
+        sim_pid = -1;
+        return false;
+    }
 
     // Open data pipe first
     data_fd = open(data_pipe.c_str(), O_RDONLY | O_NONBLOCK);
@@ -89,8 +99,10 @@ bool Client::start(const string& world,
         perror("open data.pipe failed");
         return false;
     }
+    fprintf(stderr, "[client] Data pipe opened\n");
 
-    // Retry opening command pipe until simulator connects
+    // Retry opening command pipe (with timeout)
+    int attempts = 0;
     while (true) {
         cmd_fd = open(cmd_pipe.c_str(), O_WRONLY | O_NONBLOCK);
 
@@ -98,6 +110,16 @@ bool Client::start(const string& world,
             break;
 
         if (errno == ENXIO) {
+            if (++attempts > 50) { // 5 second timeout
+                fprintf(stderr, "[client] ERROR: Timeout connecting to simulator cmd pipe\n");
+                return false;
+            }
+            // Check if simulator died while waiting
+            if (waitpid(sim_pid, &status, WNOHANG) != 0) {
+                fprintf(stderr, "[client] ERROR: Simulator died while connecting\n");
+                sim_pid = -1;
+                return false;
+            }
             usleep(100000);
         } else {
             perror("open cmd.pipe failed");
@@ -105,17 +127,17 @@ bool Client::start(const string& world,
         }
     }
 
+    fprintf(stderr, "[client] Connected to simulator successfully!\n");
     return true;
 }
 
 // ------------------------------------------------------------
 // Send STEP command and read simulator response
 // ------------------------------------------------------------
-string Client::step(int ticks
-)
+string Client::step(int ticks)
 {
     if (cmd_fd == -1 || data_fd == -1)
-        return "jkljj";
+        return "";
 
     string command = "STEP " + to_string(ticks) + "\n";
 
@@ -126,6 +148,7 @@ string Client::step(int ticks
 
     char buffer[1024];
     string response;
+    int wait_count = 0;
 
     while (true) {
         ssize_t bytes_read = read(data_fd, buffer, sizeof(buffer) - 1);
@@ -133,12 +156,17 @@ string Client::step(int ticks
         if (bytes_read > 0) {
             buffer[bytes_read] = '\0';
             response += buffer;
+            wait_count = 0; // reset timeout counter
 
             if (response.find("END") != string::npos)
                 break;
         }
         else {
-            // No data yet — wait briefly
+            // No data yet — wait briefly, but timeout after 10 seconds
+            if (++wait_count > 1000) {
+                fprintf(stderr, "[client] ERROR: Timeout reading simulator response\n");
+                return "";
+            }
             usleep(10000);
         }
     }
