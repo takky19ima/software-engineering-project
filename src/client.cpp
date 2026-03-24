@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <errno.h>
 #include <sstream>
 #include <vector>
@@ -128,6 +129,15 @@ bool Client::start(const string& world,
     }
 
     fprintf(stderr, "[client] Connected to simulator successfully!\n");
+
+    // Switch pipes to BLOCKING mode now that both ends are connected
+    int flags = fcntl(data_fd, F_GETFL);
+    fcntl(data_fd, F_SETFL, flags & ~O_NONBLOCK);
+
+    flags = fcntl(cmd_fd, F_GETFL);
+    fcntl(cmd_fd, F_SETFL, flags & ~O_NONBLOCK);
+
+    fprintf(stderr, "[client] Pipes switched to blocking mode\n");
     return true;
 }
 
@@ -141,33 +151,39 @@ string Client::step(int ticks)
 
     string command = "STEP " + to_string(ticks) + "\n";
 
-    if (write(cmd_fd, command.c_str(), command.size()) == -1) {
-        perror("write STEP failed");
+    ssize_t written = write(cmd_fd, command.c_str(), command.size());
+    if (written == -1) {
+        perror("[client] write STEP failed");
         return "";
     }
+    fprintf(stderr, "[client] Wrote %zd bytes: STEP %d\n", written, ticks);
 
-    char buffer[1024];
+    char buffer[4096];
     string response;
-    int wait_count = 0;
 
+    // Read response (blocking, with 10-second alarm timeout)
+    alarm(10);
     while (true) {
         ssize_t bytes_read = read(data_fd, buffer, sizeof(buffer) - 1);
 
         if (bytes_read > 0) {
             buffer[bytes_read] = '\0';
             response += buffer;
-            wait_count = 0; // reset timeout counter
 
-            if (response.find("END") != string::npos)
+            if (response.find("END") != string::npos) {
+                alarm(0); // cancel timeout
                 break;
+            }
+        }
+        else if (bytes_read == 0) {
+            fprintf(stderr, "[client] ERROR: data pipe closed (EOF)\n");
+            alarm(0);
+            return "";
         }
         else {
-            // No data yet — wait briefly, but timeout after 10 seconds
-            if (++wait_count > 1000) {
-                fprintf(stderr, "[client] ERROR: Timeout reading simulator response\n");
-                return "";
-            }
-            usleep(10000);
+            perror("[client] read error");
+            alarm(0);
+            return "";
         }
     }
 
