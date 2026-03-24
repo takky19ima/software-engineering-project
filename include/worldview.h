@@ -19,19 +19,19 @@ public:
     explicit WorldView(QWidget *parent = nullptr);
 
     void setBugs(const std::vector<Bug>& b);
-
     void setMap(const std::vector<std::string>& map, const std::vector<bool>& offsets);
-    void setTraceLength(int n) { traceLength = n; }
+
+public slots:
+    void setTraceLength(int n) { traceLength = n; update(); }
 
 protected:
     void paintEvent(QPaintEvent *event) override;
 
 private:
     std::vector<Bug> bugs;
-    std::vector<std::string> currentMap; 
+    std::vector<std::string> currentMap;
     std::vector<std::vector<int>> traceMap;
     std::vector<std::string> previousMap;
     int traceLength = 5;
-        std::vector<bool> offsetRows;
-
+    std::vector<bool> offsetRows;
 };

@@ -2,6 +2,8 @@
 #define MAINWINDOW_H
 
 #include <QMainWindow>
+#include <QSpinBox>
+#include <QLabel>
 #include "client.h"
 #include "worldview.h"
 
@@ -32,6 +34,7 @@ private:
     Client client;
     WorldView *view;
     QTimer *timer = nullptr;
+    QSpinBox *traceSpinBox = nullptr;
     std::vector<Bug> mapToBugs(const std::vector<std::string>& map);
     std::string world;
     std::string bug1;

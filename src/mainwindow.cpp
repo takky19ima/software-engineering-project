@@ -1,13 +1,25 @@
 #include "mainwindow.h"
 #include <QDebug>
 #include <QTimer>
+#include <QToolBar>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
 {
-
     view = new WorldView(this);
     setCentralWidget(view);
+
+    // ── Trace-length toolbar ──
+    QToolBar *toolbar = addToolBar("Trace");
+    toolbar->addWidget(new QLabel(" Trace N: "));
+
+    traceSpinBox = new QSpinBox(this);
+    traceSpinBox->setRange(0, 50);
+    traceSpinBox->setValue(5);
+    toolbar->addWidget(traceSpinBox);
+
+    connect(traceSpinBox, QOverload<int>::of(&QSpinBox::valueChanged),
+            view, &WorldView::setTraceLength);
 }
 
 MainWindow::~MainWindow()

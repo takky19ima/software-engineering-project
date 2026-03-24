@@ -1,8 +1,5 @@
-#include "client.h"
 #include "mainwindow.h"
 #include <iostream>
-#include <thread>
-#include <chrono>
 #include <QApplication>
 using namespace std;
 
@@ -36,7 +33,6 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    Client client;
 
     //Initialize Qt application
     QApplication app(argc, argv);
@@ -53,6 +49,5 @@ int main(int argc, char* argv[])
     //Enter the Qt event loop and wiats until exit is called
     int result = app.exec();
 
-    client.stop();
     return result;
 }

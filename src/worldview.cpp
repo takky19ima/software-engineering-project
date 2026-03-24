@@ -43,10 +43,10 @@ void WorldView::setMap(const std::vector<std::string>& map, const std::vector<bo
         }
     }
 
-    // 3️⃣ Fade AFTER marking — so fresh traces stay at 5 this frame
+    // 3️⃣ Fade — skip cells we just marked this frame (value == traceLength)
     for (int r = 0; r < (int)traceMap.size(); ++r)
         for (int c = 0; c < (int)traceMap[r].size(); ++c)
-            if (traceMap[r][c] > 0)
+            if (traceMap[r][c] > 0 && traceMap[r][c] < traceLength)
                 traceMap[r][c]--;
 
     previousMap = map;
@@ -144,7 +144,8 @@ void WorldView::paintEvent(QPaintEvent *)
             if (traceMap[r][c] > 0)
             {
                 QRect rect(c * cellSize + xOffset, r * cellSize, cellSize, cellSize);
-                painter.fillRect(rect, QColor(255, 200, 0, traceMap[r][c] * 40));
+                int alpha = (traceLength > 0) ? 255 * traceMap[r][c] / traceLength : 0;
+                painter.fillRect(rect, QColor(255, 165, 0, alpha));
             }
         }
     }
